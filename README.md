@@ -32,9 +32,9 @@ Two optional judge overrides go in `.env`: `JUDGE_MODEL` (default `sonnet`) and 
 Promote a GitHub repo across both platforms:
 
 ```sh
-npm run add-subject -- --repo ivan-magda/wwdc26-notes
+npm run add-subject -- --repo acme/widget-cli
 npm run subjects                              # confirm the subject id
-npm run pipeline -- --subject wwdc26-notes    # discover + judge
+npm run pipeline -- --subject widget-cli      # discover + judge
 # open data/review-queue.csv and set `decision` to approve or reject
 npm run record                                # prints what to post
 ```
@@ -42,13 +42,13 @@ npm run record                                # prints what to post
 Promote a blog post on X only:
 
 ```sh
-npm run add-subject -- --blog ../blog/src/data/blog/wwdc26-foundation-models-year-two.md
-npm run pipeline -- --subject wwdc26-foundation-models-year-two --platform x
+npm run add-subject -- --blog ../blog/posts/rate-limiting-explained.md
+npm run pipeline -- --subject rate-limiting-explained --platform x
 # review data/review-queue.csv, then:
 npm run record
 ```
 
-Put flags after `--` when you run an npm script. To call the CLI directly, drop the `--`: `tsx src/cli.ts pipeline --subject wwdc26-notes`.
+Put flags after `--` when you run an npm script. To call the CLI directly, drop the `--`: `tsx src/cli.ts pipeline --subject widget-cli`.
 
 ## Commands
 
@@ -88,12 +88,12 @@ Relevance is the judge's 0-to-100 verdict. Engagement is a batch-normalized `log
 
 ```json
 "queries": {
-  "x": "(\"foundation models\" OR \"on-device\") lang:en",
-  "linkedin": "foundation models on-device apple"
+  "x": "(\"rate limiting\" OR \"token bucket\") lang:en",
+  "linkedin": "rate limiting token bucket api"
 }
 ```
 
-Write multi-word topics as quoted phrases. On X an unquoted hyphen means exclusion, so `foundation-models` searches for `foundation` and *not* `models`. Keep `lang:en` on the X query. After editing, re-run `discover`; there is no need to re-run `add-subject`. A subject with zero keywords is rejected, because an empty query would scan every recent post and burn credits.
+Write multi-word topics as quoted phrases. On X an unquoted hyphen means exclusion, so `rate-limiting` searches for `rate` and *not* `limiting`. Keep `lang:en` on the X query. After editing, re-run `discover`; there is no need to re-run `add-subject`. A subject with zero keywords is rejected, because an empty query would scan every recent post and burn credits.
 
 ## Data layout
 
