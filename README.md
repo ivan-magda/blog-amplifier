@@ -126,10 +126,3 @@ Both search a window of roughly one week. Store prices drift, so check the live 
 ## Using this with Claude Code
 
 A packed skill lives at `.claude/skills/blog-amplifier/`. Open this repo in Claude Code and it loads the skill, so the agent knows the workflow and the query gotchas without rereading the source.
-
-## More
-
-- Design and acceptance criteria: [docs/PRD.md](docs/PRD.md).
-- Scraper research: `docs/research/`.
-
-Phase 2 is documented but not built: GitHub Actions to discover on publish and on a weekly cron, plus `embeddings` and `ollama` judge backends behind the existing `Judge` interface for unattended runs.
