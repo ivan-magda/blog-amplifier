@@ -4,8 +4,20 @@ import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
+import { stringify } from "csv-stringify/sync";
 import { appendToReviewQueue, readApprovedRows } from "./queue.js";
 import type { ScoredCandidate } from "../types.js";
+
+/**
+ * Set `decision=approve` on the last data row, independent of column layout
+ * (the read-only signal columns live after decision/final_comment now).
+ */
+function approveLastRow(raw: string): string {
+  const recs = parse(raw, { columns: true }) as Record<string, string>[];
+  const last = recs[recs.length - 1];
+  if (last) last.decision = "approve";
+  return stringify(recs, { header: true, columns: Object.keys(recs[0] ?? {}) });
+}
 
 function cand(over: Partial<ScoredCandidate> = {}): ScoredCandidate {
   return {
@@ -44,8 +56,7 @@ test("appendToReviewQueue writes a header even when the file pre-exists as 0 byt
   assert.ok(raw.startsWith("run_id,subject_id,platform"), `expected header, got: ${raw.slice(0, 40)}`);
 
   // And the row is recoverable (not consumed as the header).
-  const withApprove = raw.replace(/,,\n?$/, ",approve,\n");
-  await writeFile(file, withApprove);
+  await writeFile(file, approveLastRow(raw));
   const approved = await readApprovedRows({ file });
   assert.equal(approved.length, 1);
 
@@ -76,9 +87,8 @@ test("readApprovedRows strips the formula-guard apostrophe so the posted comment
     { runId: "r1", subjectId: "s1" },
     { file },
   );
-  let raw = await readFile(file, "utf8");
-  raw = raw.replace(/,,\n?$/, ",approve,\n"); // approve the row (decision col)
-  await writeFile(file, raw);
+  const raw = await readFile(file, "utf8");
+  await writeFile(file, approveLastRow(raw)); // approve the row (decision col)
 
   const approved = await readApprovedRows({ file });
   assert.equal(approved.length, 1);

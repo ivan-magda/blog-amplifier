@@ -1,29 +1,12 @@
 import type { Subject } from "../types.js";
 import { buildQueries } from "./index.js";
-import { asString, asStringArray, dedupe } from "./text.js";
+import { asString, asStringArray, dedupe, STOPWORDS } from "./text.js";
 
 const GITHUB_API = "https://api.github.com";
 const HEADERS = {
   "User-Agent": "blog-amplifier",
   Accept: "application/vnd.github+json",
 };
-
-/** Generic words that add noise rather than precision to a search query. */
-const STOPWORDS = new Set([
-  "the", "a", "an", "and", "or", "of", "to", "for", "in", "on", "with", "by",
-  "is", "are", "be", "this", "that", "it", "as", "at", "from", "into", "your",
-  "you", "we", "our", "my", "i", "me", "notes", "note", "repo", "repository",
-  "project", "code", "guide", "intro", "introduction", "overview", "about",
-  "readme", "docs", "doc", "documentation", "example", "examples", "sample",
-  "samples", "demo", "getting", "started", "usage", "install", "installation",
-  "setup", "table", "contents", "license", "contributing", "features", "feature",
-  "how", "what", "why", "when", "use", "using", "list", "summary",
-  // README-boilerplate noise that surfaced in testing — structural/legal words
-  // that describe a repo's layout rather than its subject matter.
-  "content", "copyright", "folder", "folders", "file", "files", "video", "videos",
-  "image", "images", "metadata", "snippet", "snippets", "section", "sections",
-  "new", "plus", "via", "etc", "more",
-]);
 
 interface RepoResponse {
   name?: unknown;

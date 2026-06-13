@@ -54,6 +54,31 @@ export const config = {
   recencyHalfLifeDays: 7,
   /** Drop candidates whose blended score is below this (0–1). */
   minScore: 0.45,
+  /**
+   * Relevance gate (PRD precision work). Topic-agnostic: it keys off the
+   * judge's generic topicClass enum, which is ONLY emitted when a subject
+   * defines disambiguation (focus/notSubject). So a subject WITHOUT those
+   * fields produces no topicClass and the gate is a no-op there — clean
+   * subjects behave exactly as before. For subjects WITH disambiguation,
+   * "drop_off_topic" stops keyword-collision posts from being out-voted into
+   * the queue by recency/engagement (validated on a noisy live batch: it
+   * removed an off-topic post the blend had surfaced at relevance 18). The
+   * scalar relevanceFloor (default 0 = off) is the fallback for candidates
+   * lacking a class.
+   */
+  gate: {
+    mode: "drop_off_topic" as "off" | "drop_off_topic" | "drop_off_topic_and_adjacent",
+    relevanceFloor: 0,
+  },
+  /** Engagement normalization scope. "batch" (default) = today's behavior
+   *  (min-max across the merged X+LinkedIn batch); "per_platform" normalizes
+   *  within each platform so cross-platform magnitude differences don't skew. */
+  engagementNormalization: "batch" as "batch" | "per_platform",
+  /** Weight of the X-only views (impressions) tiebreaker, added on top of the
+   *  blend for surviving X candidates that expose views. IDENTITY DEFAULT 0 =
+   *  no effect. Keep small (≤0.15); it should only reorder, never out-vote
+   *  relevance. LinkedIn / no-views candidates are never penalized. */
+  tiebreakViewsWeight: 0,
   /** How many top candidates to draft comments for and surface for review. */
   topN: 15,
   /** How far back to search, per platform. Kept tight (≤1 week) to surface

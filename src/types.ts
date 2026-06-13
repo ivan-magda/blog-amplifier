@@ -20,7 +20,25 @@ export interface Subject {
   keywords: string[];
   /** Ready-to-run search query per platform (editable). */
   queries: Record<Platform, string>;
+  /**
+   * Optional per-subject disambiguation (hand-editable). When set, the judge
+   * uses these to separate the true subject from keyword-collision noise; when
+   * absent, scoring and prompts behave exactly as before. Topic specificity
+   * lives here in DATA — it is never hardcoded in code.
+   *
+   * `focus`: 1–2 sentences on what THIS subject specifically is and who the
+   * ideal post author/audience is. `notSubject`: free-text phrases naming
+   * broader/adjacent topics that share keywords but are NOT this subject (read
+   * by the judge as guidance, never string-matched in scoring code).
+   */
+  focus?: string;
+  notSubject?: string[];
+  /** Provenance for auto-generated disambiguation, so a human knows to verify it. */
+  enrichment?: { source: "manual" | "auto"; model?: string; at?: string };
 }
+
+/** Generic relevance class the judge assigns when a subject defines disambiguation. */
+export type TopicClass = "on_topic" | "adjacent" | "off_topic";
 
 /** A single discovered post, normalized across platforms. */
 export interface Candidate {
@@ -45,6 +63,8 @@ export interface ScoredCandidate extends Candidate {
   relevance: number;
   /** One-line judge rationale for the relevance score. */
   rationale: string;
+  /** Generic topical class from the judge (absent => treated as on_topic). */
+  topicClass?: TopicClass;
   /** 0–1 normalized engagement signal. */
   engagementScore: number;
   /** 0–1 recency decay signal. */
@@ -77,6 +97,12 @@ export interface RelevanceResult {
   /** 0–100 topic relevance. */
   relevance: number;
   rationale: string;
+  /**
+   * Generic topical class, present only when the subject defined disambiguation
+   * (focus/notSubject) and the judge emitted it. Absent => treated as on_topic
+   * downstream, so scalar-only judges (Phase-2 embeddings/ollama) stay valid.
+   */
+  topicClass?: TopicClass;
 }
 
 /** Per-candidate drafted comment from the judge. */

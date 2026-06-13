@@ -27,6 +27,7 @@ import { getJudge } from "./judge/index.js";
 import { rankCandidates } from "./score/index.js";
 import { appendToReviewQueue, readApprovedRows } from "./review/queue.js";
 import { appendLedger, loadActionedUrls } from "./log/ledger.js";
+import { enrichSubject } from "./enrich.js";
 import { dedupeByUrl, selectCandidatesFile } from "./cli-helpers.js";
 import { PLATFORMS } from "./types.js";
 import type {
@@ -161,8 +162,37 @@ async function cmdAddSubject(flags: Flags): Promise<void> {
     throw new Error("add-subject requires --blog <path> or --repo <owner/name>");
   }
 
+  // Opt-in: draft the disambiguation fields with `claude -p`. Off by default so
+  // add-subject stays a fast, offline, deterministic step. On any failure we
+  // warn and save the subject without the fields (still valid).
+  if (flags["enrich"]) {
+    const sourceText = [
+      subject.title,
+      subject.description,
+      `Keywords: ${subject.keywords.join(", ")}`,
+    ].join("\n\n");
+    try {
+      const { focus, notSubject } = await enrichSubject(sourceText);
+      subject = {
+        ...subject,
+        focus,
+        notSubject,
+        enrichment: { source: "auto", model: config.judge.model },
+      };
+      console.log(`Enriched: drafted focus + ${notSubject.length} notSubject phrase(s).`);
+    } catch (err) {
+      console.error(
+        `enrich: skipped — ${err instanceof Error ? err.message : String(err)}. ` +
+          `Saving subject without focus/notSubject; add them by hand if you want the precision gate.`,
+      );
+    }
+  }
+
   const file = await saveSubject(subject);
   console.log(`Saved subject "${subject.id}" → ${file}`);
+  if (subject.enrichment?.source === "auto") {
+    console.log(`  NOTE: focus/notSubject were AI-drafted — review ${file} before discover.`);
+  }
 }
 
 async function cmdSubjects(): Promise<void> {
@@ -255,7 +285,23 @@ async function runJudge(candidatesFile: string): Promise<void> {
 
   await appendToReviewQueue(ranked, { runId, subjectId: batch.subjectId });
 
-  console.log(`judge: surfaced ${ranked.length} candidate(s) → ${scoredFile}`);
+  console.log(`judge: scored ${relevance.length}, surfaced ${ranked.length} candidate(s) → ${scoredFile}`);
+  if (config.gate.mode !== "off") {
+    const offTopic = relevance.filter((r) => r.topicClass === "off_topic").length;
+    const adjacent = relevance.filter((r) => r.topicClass === "adjacent").length;
+    if (offTopic || adjacent) {
+      console.log(
+        `  gate (${config.gate.mode}): judge classified ${offTopic} off_topic, ${adjacent} adjacent — ` +
+          `off_topic dropped before ranking.`,
+      );
+    }
+  }
+  if (ranked.length === 0 && relevance.length > 0) {
+    console.log(
+      "  NOTE: the queue is empty — every candidate was gated or fell below minScore. " +
+        "That means 'no good targets in this batch', NOT a failure.",
+    );
+  }
   console.log(`Review queue: ${config.paths.reviewQueue}`);
   console.log(
     'Next: open the CSV, set the `decision` column to "approve"/"reject" ' +
@@ -333,7 +379,7 @@ const USAGE = `blog-amplifier — find, rank, draft & review conversations to jo
 Usage: <command> [flags]
 
 Commands:
-  add-subject --blog <path> | --repo <owner/name>
+  add-subject --blog <path> | --repo <owner/name> [--enrich]
         Extract metadata into subjects/<id>.json.
   subjects
         List saved subject ids.

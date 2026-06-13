@@ -3,21 +3,7 @@ import fs from "node:fs/promises";
 import matter from "gray-matter";
 import type { Subject } from "../types.js";
 import { buildQueries } from "./index.js";
-import { asString, asStringArray, dedupe } from "./text.js";
-
-/**
- * Distinctive multi-word product/feature phrases worth pulling out of a title
- * verbatim. Matched case-insensitively but emitted in canonical casing so the
- * resulting search queries quote them cleanly. These are the proper nouns that
- * make a search precise — generic title words add noise, these do not.
- */
-const DISTINCTIVE_TITLE_PHRASES = [
-  "Foundation Models",
-  "Private Cloud Compute",
-  "Dynamic Profiles",
-  "Apple Intelligence",
-  "LanguageModelSession",
-];
+import { asString, asStringArray, dedupe, distinctivePhrases } from "./text.js";
 
 /**
  * Build a `Subject` from an AstroPaper blog post's frontmatter.
@@ -43,9 +29,11 @@ export async function fromBlogPost(filePath: string): Promise<Subject> {
   const description = asString(fm.description);
   const tags = asStringArray(fm.tags);
 
-  // Lead with the distinctive title phrases so they win the query's top slots
-  // (and their canonical casing wins de-duplication over slug-style tags).
-  const titlePhrases = distinctivePhrasesFromTitle(title).slice(0, 3);
+  // Lead with distinctive phrases lifted from the title by orthography (proper
+  // names / CamelCase / quoted spans) so they win the query's top slots. This
+  // is a generic heuristic — real precision comes from the per-subject query
+  // and the hand-authored focus/notSubject, so a weak lift is a quick edit.
+  const titlePhrases = distinctivePhrases(title);
   const keywords = dedupe([...titlePhrases, ...tags]);
 
   return {
@@ -57,13 +45,5 @@ export async function fromBlogPost(filePath: string): Promise<Subject> {
     keywords,
     queries: buildQueries(keywords, tags),
   };
-}
-
-/** Pick known distinctive multi-word phrases that actually appear in `title`. */
-function distinctivePhrasesFromTitle(title: string): string[] {
-  const haystack = title.toLowerCase();
-  return DISTINCTIVE_TITLE_PHRASES.filter((phrase) =>
-    haystack.includes(phrase.toLowerCase()),
-  );
 }
 

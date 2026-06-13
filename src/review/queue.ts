@@ -24,6 +24,12 @@ const COLUMNS = [
   "draft_comment",
   "decision",
   "final_comment",
+  // Read-only signal columns for the human gate, APPENDED after the edit
+  // columns so `decision`/`final_comment` keep their positions for any
+  // in-flight CSV (readApprovedRows is header-keyed, so this is read-safe).
+  "views",
+  "links_out",
+  "asks_question",
 ] as const;
 
 /** Max characters of post body to surface in the CSV (kept readable). */
@@ -36,6 +42,11 @@ function round3(n: number): number {
 
 function truncate(text: string, limit: number): string {
   return text.length > limit ? text.slice(0, limit) : text;
+}
+
+/** Count outbound links in a post body (generic; any http(s) URL). */
+function countLinks(text: string): number {
+  return (text.match(/https?:\/\/\S+/g) ?? []).length;
 }
 
 function toRecord(row: ScoredCandidate, meta: { runId: string; subjectId: string }) {
@@ -55,6 +66,10 @@ function toRecord(row: ScoredCandidate, meta: { runId: string; subjectId: string
     draft_comment: row.draft ?? "",
     decision: "",
     final_comment: "",
+    // Read-only signals to help the human judge reach + reply-worthiness.
+    views: row.views ?? "",
+    links_out: countLinks(row.text),
+    asks_question: row.text.includes("?") ? "true" : "false",
   };
 }
 

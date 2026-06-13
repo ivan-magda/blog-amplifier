@@ -15,5 +15,12 @@
   "queries": {
     "x": "(\"Foundation Models\" OR \"Apple Intelligence\" OR LanguageModelSession OR \"Private Cloud Compute\") lang:en",
     "linkedin": "Foundation Models wwdc apple intelligence swift ai agents"
-  }
+  },
+  "focus": "Apple's Swift Foundation Models framework — the on-device + Private Cloud Compute LLM API for building features in Swift apps (LanguageModelSession, @Generable, tool calling, Dynamic Profiles). The ideal post author is an iOS/Swift developer building with or evaluating this framework.",
+  "notSubject": [
+    "generic machine-learning 'foundation models' or LLMs from other vendors",
+    "national or sovereign AI policy and 'build our own foundation models' geopolitics",
+    "consumer Apple Intelligence or Siri product news, opinions, or how-tos",
+    "Apple stock, business, or partnership commentary"
+  ]
 }
