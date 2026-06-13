@@ -1,0 +1,23 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+.pnp.*
+
+# Pipeline outputs / scraped data
+data/candidates/
+data/*.csv
+data/*.jsonl
+!data/.gitkeep
+
+# Tooling scratch
+.playwright-mcp/
+
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
