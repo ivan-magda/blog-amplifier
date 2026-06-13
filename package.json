@@ -4,6 +4,8 @@
   "description": "Find existing X/LinkedIn conversations about your blog posts or GitHub repos, rank them, draft value-add comments, and review before posting manually.",
   "type": "module",
   "private": true,
+  "license": "MIT",
+  "author": "Ivan Magda",
   "engines": {
     "node": ">=20.12"
   },
