@@ -71,16 +71,19 @@ export async function appendToReviewQueue(
   const file = opts?.file ?? config.paths.reviewQueue;
   const records = rows.map((row) => toRecord(row, meta));
 
-  // Write the header when the file is missing OR empty. A 0-byte file (from an
-  // interrupted append or a manual `touch`) must still get a header — otherwise
-  // the first data row is parsed AS the header and that approved row is lost.
-  let needHeader = true;
+  // Read the existing file so we can (a) write the header when it is missing or
+  // empty — a 0-byte file must still get a header, else its first data row is
+  // parsed AS the header and that approved row is lost — and (b) guarantee a
+  // separating newline before headerless rows, so a hand-edit that dropped the
+  // trailing newline can't glue our first row onto the previous last row.
+  let existing = "";
   try {
-    const st = await fs.stat(file);
-    needHeader = st.size === 0;
+    existing = await fs.readFile(file, "utf8");
   } catch {
-    needHeader = true;
+    existing = "";
   }
+  const needHeader = existing.length === 0;
+  const separator = !needHeader && !existing.endsWith("\n") ? "\n" : "";
 
   const csv = stringify(records, {
     header: needHeader,
@@ -91,7 +94,7 @@ export async function appendToReviewQueue(
   });
 
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.appendFile(file, csv, "utf8");
+  await fs.appendFile(file, separator + csv, "utf8");
 }
 
 /** A review-queue row the human approved, ready to record + post. */
@@ -118,9 +121,12 @@ export async function readApprovedRows(opts?: { file?: string }): Promise<Approv
     throw err;
   }
 
+  // relax_column_count: a single malformed/merged row (e.g. from a hand-edit)
+  // must not throw and abort recording every other already-approved row.
   const records = parse(raw, {
     columns: true,
     skip_empty_lines: true,
+    relax_column_count: true,
   }) as Record<string, string>[];
 
   const approved: ApprovedRow[] = [];

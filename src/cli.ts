@@ -184,6 +184,12 @@ async function runDiscover(flags: Flags): Promise<{ id: string; file: string }> 
   const platforms = resolvePlatforms(flags);
 
   const subject = await loadSubject(id);
+  if (subject.keywords.length === 0) {
+    throw new Error(
+      `Subject "${id}" has no keywords — discovery would issue an unbounded query ` +
+        `(every recent post) and waste credits. Add keywords to subjects/${id}.json first.`,
+    );
+  }
   const found = await discover(subject, platforms);
 
   // Drop URLs already actioned (ledger dedup) AND duplicates within this batch

@@ -21,6 +21,17 @@ export async function runActor(
 
   const client = new ApifyClient({ token });
   const run = await client.actor(actorId).call(input);
+  // `call()` resolves for ANY terminal status (SUCCEEDED / FAILED / ABORTED /
+  // TIMED-OUT) — it does NOT reject on a failed run. Without this check a failed
+  // or timed-out scrape would silently return its empty/partial dataset as if
+  // it were "0 results found" (while still being billed). Fail loudly instead.
+  if (run.status !== "SUCCEEDED") {
+    throw new Error(
+      `Apify actor "${actorId}" run did not succeed (status: ${run.status}` +
+        `${run.statusMessage ? ` — ${run.statusMessage}` : ""}). ` +
+        "Results would be empty or partial; not treating this as a complete run.",
+    );
+  }
   // `opts.maxItems` is a belt-and-suspenders fetch-side cap: callers also pass
   // the cap in the actor input (maxItems/maxPosts) to bound run cost, but actors
   // don't always honor it, so we also limit what we read from the dataset.

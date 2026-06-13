@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { parse } from "csv-parse/sync";
 import { appendToReviewQueue, readApprovedRows } from "./queue.js";
 import type { ScoredCandidate } from "../types.js";
 
@@ -82,6 +83,38 @@ test("readApprovedRows strips the formula-guard apostrophe so the posted comment
   const approved = await readApprovedRows({ file });
   assert.equal(approved.length, 1);
   assert.equal(approved[0]?.comment, "@alice great point — also -1 and =42");
+
+  await rm(path.dirname(file), { recursive: true, force: true });
+});
+
+test("appendToReviewQueue inserts a separator newline when the file lost its trailing one", async () => {
+  const file = await tmpFile("queue-newline-");
+  await appendToReviewQueue([cand({ url: "https://x.test/a" })], { runId: "r1", subjectId: "s1" }, { file });
+  // Simulate a hand-edit that dropped the trailing newline.
+  await writeFile(file, (await readFile(file, "utf8")).replace(/\n+$/, ""));
+  // Next batch appends headerless rows.
+  await appendToReviewQueue([cand({ url: "https://x.test/b" })], { runId: "r2", subjectId: "s1" }, { file });
+
+  const rows = parse(await readFile(file, "utf8"), { columns: true, skip_empty_lines: true });
+  assert.equal(rows.length, 2, "rows must stay separate, not glue into one over-long line");
+  assert.deepEqual(
+    rows.map((r: Record<string, string>) => r.url),
+    ["https://x.test/a", "https://x.test/b"],
+  );
+
+  await rm(path.dirname(file), { recursive: true, force: true });
+});
+
+test("readApprovedRows tolerates a malformed row instead of throwing", async () => {
+  const file = await tmpFile("queue-malformed-");
+  const good = `r1,s1,x,0.8,90,0.5,0.9,alice,100,2026-06-13,https://x.test/ok,hi,draftA,approve,`;
+  const malformed = `r1,s1,x,oops,too,few`; // wrong column count
+  await writeFile(file, `${HEADER}\n${good}\n${malformed}\n`);
+
+  // Must not throw; the valid approved row is still returned.
+  const approved = await readApprovedRows({ file });
+  assert.equal(approved.length, 1);
+  assert.equal(approved[0]?.url, "https://x.test/ok");
 
   await rm(path.dirname(file), { recursive: true, force: true });
 });
