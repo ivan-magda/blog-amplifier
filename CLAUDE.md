@@ -9,6 +9,7 @@ CLI that finds existing X/LinkedIn conversations about a blog post or repo, rank
 
 - Typecheck: `npm run typecheck`. Tests: `npm test` (`node --import tsx --test`).
 - Run the CLI in dev: `tsx src/cli.ts <command>`.
+- Validate a ranking/precision change with a live before/after -> `scripts/eval-precision.ts` (`EVAL_CANDS` / `EVAL_GOLD` / `EVAL_SUBJECT`).
 
 ## Hard constraints (violating these is a real bug, not a style choice)
 
@@ -21,6 +22,8 @@ CLI that finds existing X/LinkedIn conversations about a blog post or repo, rank
 - Node >= 20.12, TypeScript ESM (strict). Relative imports use `.js` extensions (NodeNext) even though sources are `.ts`.
 - Actor ids, scoring weights, paths, and judge model/timeout are centralized in `src/config.ts`; change them there, not inline.
 - Extend scoring/drafting through the `Judge` interface (`src/judge`); `embeddings`/`ollama` are Phase-2 drop-ins behind it, not edits to `claude-cli`.
+- Topic specificity lives only in `subjects/<id>.json` (`focus`/`notSubject`); keep extract/judge/score topic-agnostic — no subject/topic string literals in code (a hardcoded title-phrase list was a real bug).
+- `focus`/`notSubject` make the judge emit an optional `topicClass`; the relevance gate (`config.gate`, default `drop_off_topic`) keys off it and is a no-op when absent, so subjects without disambiguation rank exactly as before. Keep `topicClass` optional on `RelevanceResult` (Phase-2 seam).
 
 ## Gotchas
 

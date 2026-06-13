@@ -7,11 +7,8 @@
 node_modules/
 .pnp.*
 
-# Pipeline outputs / scraped data
-data/candidates/
-data/queue/
-data/*.csv
-data/*.jsonl
+# Pipeline outputs / scraped data (ignore everything but the dir placeholder)
+data/*
 !data/.gitkeep
 
 # Tooling scratch
