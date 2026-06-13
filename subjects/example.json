@@ -1,0 +1,25 @@
+{
+  "id": "example",
+  "type": "blog",
+  "url": "https://example.com/posts/rate-limiting-explained",
+  "title": "Rate Limiting Explained: Token Bucket vs Leaky Bucket",
+  "description": "A hands-on walkthrough of building an API rate limiter, comparing the token-bucket and leaky-bucket algorithms with real code.",
+  "keywords": [
+    "rate limiting",
+    "token bucket",
+    "leaky bucket",
+    "api",
+    "backend"
+  ],
+  "queries": {
+    "x": "(\"rate limiting\" OR \"token bucket\") lang:en",
+    "linkedin": "rate limiting token bucket api"
+  },
+  "focus": "A hands-on engineering post about implementing API rate limiting — token-bucket and leaky-bucket algorithms, per-key limits, and absorbing bursts. The ideal post author is a backend engineer building or debugging a rate limiter in their own service.",
+  "notSubject": [
+    "generic 'scale your startup' or API-product marketing",
+    "network or ISP rate limiting at the router/QoS layer",
+    "complaints about a third-party SaaS API's limits with no implementation angle",
+    "crypto or trading talk that happens to use the words 'rate' or 'token'"
+  ]
+}

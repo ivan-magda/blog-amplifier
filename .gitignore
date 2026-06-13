@@ -11,6 +11,10 @@ node_modules/
 data/*
 !data/.gitkeep
 
+# Subjects you create (ship only the example template, keep your own private)
+subjects/*
+!subjects/example.json
+
 # Tooling scratch
 .playwright-mcp/
 
