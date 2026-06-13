@@ -1,82 +1,135 @@
 # blog-amplifier
 
-A command-line tool that finds existing conversations on **X/Twitter** and **LinkedIn** about something you want to promote — a **blog post** or a **GitHub repo** — ranks them by relevance, engagement, and recency, drafts a value-adding comment for each with AI, and routes everything through a human-review gate before you post **manually**.
+Find existing X/Twitter and LinkedIn conversations about your blog post or GitHub repo, rank them, draft a comment for each, and review the queue before you post by hand.
 
-It is built on one principle: discovery and commenting are separate problems. Every reliable scraper is read-only; every automated write path is cookie-based and ToS-risky. So this tool automates discovery → scoring → drafting and leaves posting to a human.
+## Why it works this way
 
-## Safety model
+Scrapers read public posts without a login. Automated posting needs your account cookies and breaks platform rules. This tool automates the safe half (find, rank, draft) and leaves posting to you:
 
-- **Read-only, cookie-free discovery.** Discovery runs through Apify actors (xquik for X, HarvestAPI for LinkedIn) that need no login and no cookies. Your personal accounts are never handed to any tool. xquik is the default because it runs on Apify's **free plan**; swap to `apidojo/tweet-scraper` (higher-trust, same output fields) on a paid plan via `src/config.ts`.
-- **Mandatory human review.** Every surfaced candidate lands in `data/review-queue.csv`. Nothing proceeds until you set the `decision` column by hand.
-- **Manual posting.** The tool never posts. `record` prints a checklist; you post the approved comments yourself, at a human pace.
-- **Ledger idempotency.** Every recorded action is appended to `data/actions.log.jsonl`. Re-running `record` never double-records, and a later `discover` run never re-surfaces a URL you have already engaged.
+- **Read-only discovery.** Apify actors (xquik for X, HarvestAPI for LinkedIn) fetch public posts with no login and no cookies. Your accounts stay out of it.
+- **A human gate.** The judge writes each candidate to `data/review-queue.csv`. Nothing moves forward until you set the `decision` column yourself.
+- **Manual posting.** `record` prints a checklist. You post the approved comments at your own pace.
+- **An idempotent ledger.** `data/actions.log.jsonl` records what you posted. Re-running `record` never double-records, and the next `discover` skips URLs you already engaged.
 
-## Prerequisites
+## Requirements
 
-- **Node >= 20.12** (uses `process.loadEnvFile`, no `dotenv` dependency).
-- `npm install`.
-- `cp .env.example .env` and set `APIFY_TOKEN` (from https://console.apify.com/account/integrations).
-- The `claude` CLI installed and logged in (`claude`, then `/login`). The judge shells out to `claude -p` and uses your local Claude Code subscription — **no metered API key**. Optional `.env` overrides: `JUDGE_MODEL` (default `sonnet`), `JUDGE_TIMEOUT_MS`.
+- Node 20.12 or newer. The CLI loads `.env` with `process.loadEnvFile`, so there is no `dotenv` dependency.
+- An Apify token, from https://console.apify.com/account/integrations.
+- The `claude` CLI, installed and logged in. The judge runs `claude -p` against your Claude Code subscription, so no metered API key is involved.
 
-## Commands
+## Setup
 
-Run via the npm scripts (note the `--` before flags) or directly with `tsx src/cli.ts <command>`.
+```sh
+npm install
+cp .env.example .env      # then set APIFY_TOKEN
+claude                    # then run /login once, to authenticate the judge
+```
 
-| Command | What it does |
-|---|---|
-| `add-subject --blog <path>` / `--repo <owner/name>` | Extract metadata → `subjects/<id>.json` |
-| `subjects` | List saved subject ids |
-| `discover --subject <id> [--platform x\|linkedin\|both]` | Discover, drop already-actioned URLs → `data/candidates/<id>-<ts>.candidates.json` |
-| `judge --run <id\|latest\|path>` | Relevance-score + draft → `data/queue/<id>-<ts>.scored.json` + append to `review-queue.csv` |
-| `record` | Read approved rows → append to ledger; print manual posting checklist |
-| `pipeline --subject <id> [--platform ...]` | `discover` + `judge` in one step |
-| `help` | Show usage |
+Two optional judge overrides go in `.env`: `JUDGE_MODEL` (default `sonnet`) and `JUDGE_TIMEOUT_MS` (default `180000`).
 
-### Example: a GitHub repo
+## Quick start
+
+Promote a GitHub repo across both platforms:
 
 ```sh
 npm run add-subject -- --repo ivan-magda/wwdc26-notes
-npm run subjects
-npm run discover -- --subject wwdc26-notes            # both platforms
-npm run judge -- --run latest
-# ...edit data/review-queue.csv: set `decision` to approve/reject...
-npm run record
+npm run subjects                              # confirm the subject id
+npm run pipeline -- --subject wwdc26-notes    # discover + judge
+# open data/review-queue.csv and set `decision` to approve or reject
+npm run record                                # prints what to post
 ```
 
-### Example: a blog post
+Promote a blog post on X only:
 
 ```sh
 npm run add-subject -- --blog ../blog/src/data/blog/wwdc26-foundation-models-year-two.md
 npm run pipeline -- --subject wwdc26-foundation-models-year-two --platform x
-# ...review data/review-queue.csv...
+# review data/review-queue.csv, then:
 npm run record
 ```
+
+Put flags after `--` when you run an npm script. To call the CLI directly, drop the `--`: `tsx src/cli.ts pipeline --subject wwdc26-notes`.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `add-subject --blog <path>` or `--repo <owner/name>` | Read metadata and write `subjects/<id>.json`. |
+| `subjects` | List saved subject ids. |
+| `discover --subject <id> [--platform x\|linkedin\|both]` | Run the actors, drop URLs you already actioned, and write `data/candidates/<id>-<ts>.candidates.json`. Default platform is both. |
+| `judge --run <id\|latest\|path>` | Score relevance, draft comments, write `data/queue/<id>-<ts>.scored.json`, and append rows to `data/review-queue.csv`. |
+| `record` | Read the approved rows, append them to the ledger, and print a manual posting checklist. |
+| `pipeline --subject <id> [--platform ...]` | Run `discover` then `judge` in one step. |
+
+For usage text, run `tsx src/cli.ts help` (there is no `npm run help` script).
+
+Which calls cost money: `discover` and `pipeline` spend Apify credits. `judge` uses your `claude` subscription and touches no paid API, so re-running it against saved candidates costs nothing. `add-subject`, `subjects`, and `record` make no paid calls.
+
+## The review gate
+
+`judge` writes one row per candidate to `data/review-queue.csv`. Open it in a spreadsheet or editor and set two columns:
+
+- `decision`: `approve`, `reject`, or blank for pending.
+- `final_comment`: optional. Leave it blank to use the AI `draft_comment`.
+
+`record` then reads the `approve` rows, takes `final_comment` or falls back to `draft_comment`, appends each to the ledger, and prints the comments for you to post by hand.
+
+## How ranking works
+
+```
+score = 0.6 · (relevance / 100) + 0.25 · engagement + 0.15 · recency
+```
+
+Relevance is the judge's 0-to-100 verdict. Engagement is a batch-normalized `log1p(likes + 2·replies + reposts)`. Recency decays on a 7-day half-life. Rows below `minScore` (0.45) drop out, and the judge keeps the top 15. The weights live in `src/config.ts`.
+
+## Tuning a subject
+
+`add-subject` writes a starting query, but you will get better results by editing `subjects/<id>.json`. Each subject holds a per-platform query under `queries`:
+
+```json
+"queries": {
+  "x": "(\"foundation models\" OR \"on-device\") lang:en",
+  "linkedin": "foundation models on-device apple"
+}
+```
+
+Write multi-word topics as quoted phrases. On X an unquoted hyphen means exclusion, so `foundation-models` searches for `foundation` and *not* `models`. Keep `lang:en` on the X query. After editing, re-run `discover`; there is no need to re-run `add-subject`. A subject with zero keywords is rejected, because an empty query would scan every recent post and burn credits.
 
 ## Data layout
 
 ```
-subjects/<id>.json                       editable Subject (id, keywords, per-platform queries)
-data/candidates/<id>-<ts>.candidates.json normalized Candidate[] from a discover run
-data/queue/<id>-<ts>.scored.json          ranked ScoredCandidate[] with drafts
-data/review-queue.csv                      THE HUMAN GATE — you edit this
-data/actions.log.jsonl                     append-only ledger (idempotency + dedup)
+subjects/<id>.json                          the subject you edit (keywords, per-platform queries)
+data/candidates/<id>-<ts>.candidates.json   normalized candidates from one discover run
+data/queue/<id>-<ts>.scored.json            ranked candidates with drafts
+data/review-queue.csv                       the human gate you edit
+data/actions.log.jsonl                      append-only ledger for idempotency and dedup
 ```
 
-## Where review happens
+## Apify on the free plan
 
-`judge` appends one row per surfaced candidate to `data/review-queue.csv`. Open it in Excel/Numbers/Sheets and edit two columns:
+The defaults run on Apify's free plan:
 
-- `decision` — `approve`, `reject`, or blank (pending).
-- `final_comment` — optional; blank means use the AI `draft_comment`.
+- X uses `xquik/x-tweet-scraper`, about $0.15 per 1,000 results. On a paid plan you can swap it for `apidojo/tweet-scraper` in `src/config.ts`, which returns the same output fields. That actor blocks free-plan API access, so leave the default in place while you are on free.
+- LinkedIn uses `harvestapi/linkedin-post-search`, from about $1.50 per 1,000 results, with no cookies or account.
 
-`record` then reads the `approve` rows, takes `final_comment || draft_comment`, appends to the ledger, and prints what to post by hand.
+Both search a window of roughly one week. Store prices drift, so check the live rate before a large run and try a scoped `--platform x` run first to gauge credit use.
 
-## How scoring works
+## Troubleshooting
 
-`score = 0.6·(relevance/100) + 0.25·engagement + 0.15·recency` — relevance is the judge's 0–100 verdict, engagement is a batch-normalized `log1p(likes + 2·replies + reposts)`, and recency decays with a 7-day half-life; rows below `minScore` are dropped and the top 15 are kept (all tunable in `src/config.ts`).
+| Symptom | Cause and fix |
+|---|---|
+| `judge: WARNING — scored 0 of N candidates` | Every `claude` batch failed, so nothing was scored (not the same as finding no relevant posts). Confirm `claude` is logged in, raise `JUDGE_TIMEOUT_MS` if the error mentions a timeout, then re-run `judge --run latest`, which spends no Apify credits. |
+| `APIFY_TOKEN is not set` | Set it in `.env`. |
+| `Failed to spawn claude` | Install the `claude` CLI and run `/login`. |
+| `record` reports no approved rows | Set `decision` to `approve` in the CSV first. |
+
+## Using this with Claude Code
+
+A packed skill lives at `.claude/skills/blog-amplifier/`. Open this repo in Claude Code and it loads the skill, so the agent knows the workflow and the query gotchas without rereading the source.
 
 ## More
 
-Full design and acceptance criteria: [docs/PRD.md](docs/PRD.md).
+- Design and acceptance criteria: [docs/PRD.md](docs/PRD.md).
+- Scraper research: `docs/research/`.
 
-**Phase 2 (documented, not built):** GitHub Actions for discovery on blog-publish and a weekly cron, plus `embeddings`/`ollama` judge backends behind the existing `Judge` interface for unattended runs.
+Phase 2 is documented but not built: GitHub Actions to discover on publish and on a weekly cron, plus `embeddings` and `ollama` judge backends behind the existing `Judge` interface for unattended runs.
