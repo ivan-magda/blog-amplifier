@@ -9,6 +9,7 @@ node_modules/
 
 # Pipeline outputs / scraped data
 data/candidates/
+data/queue/
 data/*.csv
 data/*.jsonl
 !data/.gitkeep

@@ -1,0 +1,33 @@
+{
+  "name": "blog-amplifier",
+  "version": "0.1.0",
+  "description": "Find existing X/LinkedIn conversations about your blog posts or GitHub repos, rank them, draft value-add comments, and review before posting manually.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "add-subject": "tsx src/cli.ts add-subject",
+    "subjects": "tsx src/cli.ts subjects",
+    "discover": "tsx src/cli.ts discover",
+    "judge": "tsx src/cli.ts judge",
+    "record": "tsx src/cli.ts record",
+    "pipeline": "tsx src/cli.ts pipeline",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "apify-client": "^2.12.0",
+    "csv-parse": "^5.6.0",
+    "csv-stringify": "^6.5.2",
+    "gray-matter": "^4.0.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

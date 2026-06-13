@@ -1,0 +1,22 @@
+{
+  "id": "wwdc26-notes",
+  "type": "github",
+  "url": "https://github.com/ivan-magda/wwdc26-notes",
+  "title": "wwdc26-notes",
+  "description": "WWDC 2026 session notes: LLM-written digests plus Apple's transcripts, metadata, and code snippets",
+  "keywords": [
+    "wwdc26",
+    "WWDC26 session",
+    "Keynote event",
+    "Apple Intelligence Foundation",
+    "Siri App Intents",
+    "Machine learning MLX",
+    "Swift SwiftData",
+    "SwiftUI UI frameworks",
+    "Developer tools"
+  ],
+  "queries": {
+    "x": "(wwdc26 OR \"WWDC26 session\" OR \"Keynote event\" OR \"Apple Intelligence Foundation\" OR \"Siri App Intents\") lang:en",
+    "linkedin": "wwdc26 WWDC26 session Keynote event Apple Intelligence Foundation Siri App Intents"
+  }
+}

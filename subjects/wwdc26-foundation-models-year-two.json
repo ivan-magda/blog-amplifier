@@ -1,0 +1,19 @@
+{
+  "id": "wwdc26-foundation-models-year-two",
+  "type": "blog",
+  "url": "https://ivanmagda.dev/posts/wwdc26-foundation-models-year-two/",
+  "title": "Foundation Models, Year Two: From On-Device API to General LLM Runtime",
+  "description": "WWDC26 turned Foundation Models into Swift's general LLM client: a rebuilt on-device model, a server model with no API keys, and the first real agent primitives.",
+  "keywords": [
+    "Foundation Models",
+    "wwdc",
+    "foundation-models",
+    "apple-intelligence",
+    "swift",
+    "ai-agents"
+  ],
+  "queries": {
+    "x": "(\"Foundation Models\" OR \"Apple Intelligence\" OR LanguageModelSession OR \"Private Cloud Compute\") lang:en",
+    "linkedin": "Foundation Models wwdc apple intelligence swift ai agents"
+  }
+}
