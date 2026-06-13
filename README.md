@@ -122,7 +122,3 @@ Both search a window of roughly one week. Store prices drift, so check the live 
 | `APIFY_TOKEN is not set` | Set it in `.env`. |
 | `Failed to spawn claude` | Install the `claude` CLI and run `/login`. |
 | `record` reports no approved rows | Set `decision` to `approve` in the CSV first. |
-
-## Using this with Claude Code
-
-A packed skill lives at `.claude/skills/blog-amplifier/`. Open this repo in Claude Code and it loads the skill, so the agent knows the workflow and the query gotchas without rereading the source.
