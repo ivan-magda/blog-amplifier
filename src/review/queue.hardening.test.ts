@@ -51,16 +51,37 @@ test("appendToReviewQueue writes a header even when the file pre-exists as 0 byt
   await rm(path.dirname(file), { recursive: true, force: true });
 });
 
-test("appendToReviewQueue neutralizes spreadsheet formula-injection cells", async () => {
+test("appendToReviewQueue neutralizes =,+,-,@ formula-injection cells (incl. draft)", async () => {
   const file = await tmpFile("queue-formula-");
   await appendToReviewQueue(
-    [cand({ author: '=HYPERLINK("http://evil","x")', text: "+cmd|'/c calc'!A1" })],
+    [cand({ author: '=HYPERLINK("http://evil","x")', text: "+cmd|'/c calc'!A1", draft: "-2+3", url: "@x" })],
     { runId: "r1", subjectId: "s1" },
     { file },
   );
   const raw = await readFile(file, "utf8");
-  assert.ok(raw.includes("'=HYPERLINK"), "formula author cell should be prefixed with an apostrophe");
-  assert.ok(raw.includes("'+cmd"), "formula text cell should be prefixed with an apostrophe");
+  assert.ok(raw.includes("'=HYPERLINK"), "= author cell should be apostrophe-prefixed");
+  assert.ok(raw.includes("'+cmd"), "+ text cell should be apostrophe-prefixed");
+  assert.ok(raw.includes("'-2+3"), "- draft cell should be apostrophe-prefixed");
+  assert.ok(raw.includes("'@x"), "@ url cell should be apostrophe-prefixed");
+
+  await rm(path.dirname(file), { recursive: true, force: true });
+});
+
+test("readApprovedRows strips the formula-guard apostrophe so the posted comment is intact", async () => {
+  const file = await tmpFile("queue-roundtrip-");
+  // A draft that begins with @ gets escaped on write; the posted comment must not keep the '.
+  await appendToReviewQueue(
+    [cand({ draft: "@alice great point — also -1 and =42" })],
+    { runId: "r1", subjectId: "s1" },
+    { file },
+  );
+  let raw = await readFile(file, "utf8");
+  raw = raw.replace(/,,\n?$/, ",approve,\n"); // approve the row (decision col)
+  await writeFile(file, raw);
+
+  const approved = await readApprovedRows({ file });
+  assert.equal(approved.length, 1);
+  assert.equal(approved[0]?.comment, "@alice great point — also -1 and =42");
 
   await rm(path.dirname(file), { recursive: true, force: true });
 });

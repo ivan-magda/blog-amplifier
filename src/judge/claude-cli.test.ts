@@ -27,3 +27,10 @@ test("sliceToBrackets returns null when there is no opener or it never balances"
   assert.equal(sliceToBrackets("no json here"), null);
   assert.equal(sliceToBrackets('[{"a":1}'), null);
 });
+
+test("sliceToBrackets is not fooled by a ']' inside a string before later elements + trailing prose", () => {
+  // The old first-open/last-close scan would over-grab to the trailing ']';
+  // the string-aware depth scan stops at the real structural close.
+  const s = sliceToBrackets('[{"comment":"closes here ]"}, {"x":1}] trailing ] prose');
+  assert.deepEqual(JSON.parse(s as string), [{ comment: "closes here ]" }, { x: 1 }]);
+});

@@ -138,8 +138,11 @@ export async function readApprovedRows(opts?: { file?: string }): Promise<Approv
     }
 
     const finalComment = rec.final_comment;
-    const comment =
+    const rawComment =
       finalComment && finalComment.trim() ? finalComment : (rec.draft_comment ?? "");
+    // Undo the leading apostrophe escape_formulas prepends to cells starting
+    // with = + - @ \t \r, so the comment you post/log keeps its original text.
+    const comment = rawComment.replace(/^'(?=[=+\-@\t\r])/, "");
 
     approved.push({
       subjectId: rec.subject_id ?? "",

@@ -12,9 +12,13 @@ test("loadActionedUrls skips a malformed line and still returns the good URLs", 
     file,
     JSON.stringify({ url: "https://a.test/1", status: "posted" }) +
       "\n" +
-      "{ this is not valid json\n" +
+      "{ this is not valid json\n" + // unparseable -> skipped
+      "42\n" + // valid JSON but not an object, no url -> adds nothing, no throw
+      '"plain string"\n' + // ditto
+      "null\n" + // null.url access is guarded
       JSON.stringify({ url: "https://a.test/2", status: "posted" }) +
-      "\n",
+      "\n" +
+      "{ truncated at EOF, no newline", // malformed final line without trailing \n
   );
 
   const urls = await loadActionedUrls({ file });

@@ -27,6 +27,7 @@ import { getJudge } from "./judge/index.js";
 import { rankCandidates } from "./score/index.js";
 import { appendToReviewQueue, readApprovedRows } from "./review/queue.js";
 import { appendLedger, loadActionedUrls } from "./log/ledger.js";
+import { dedupeByUrl, selectCandidatesFile } from "./cli-helpers.js";
 import { PLATFORMS } from "./types.js";
 import type {
   CandidateBatch,
@@ -125,22 +126,8 @@ async function resolveCandidatesFile(run: string): Promise<string> {
 
   const dir = config.paths.candidates;
   const entries = await fs.readdir(dir).catch(() => [] as string[]);
-  const all = entries.filter((f) => f.endsWith(".candidates.json")).sort();
-
-  if (run !== "latest") {
-    // Require the segment after `<id>-` to be a timestamp (starts with a 4-digit
-    // year), so `--run wwdc26-notes` can't match `wwdc26-notes-deep-dive-...`
-    // and `--run foo` can't match a different subject that merely shares `foo-`.
-    const prefix = `${run}-`;
-    const matches = all.filter(
-      (f) => f.startsWith(prefix) && /^\d{4}-/.test(f.slice(prefix.length)),
-    );
-    const newest = matches.at(-1);
-    if (newest) return path.join(dir, newest);
-  }
-
-  const newestOverall = all.at(-1);
-  if (newestOverall) return path.join(dir, newestOverall);
+  const selected = selectCandidatesFile(entries, run);
+  if (selected) return path.join(dir, selected);
 
   throw new Error(
     `No candidates file found for --run "${run}". Run \`discover\` first.`,
@@ -202,12 +189,7 @@ async function runDiscover(flags: Flags): Promise<{ id: string; file: string }> 
   // Drop URLs already actioned (ledger dedup) AND duplicates within this batch
   // (actors can return the same post twice; a URL can appear on both platforms).
   const actioned = await loadActionedUrls();
-  const seen = new Set<string>();
-  const kept = found.filter((c) => {
-    if (actioned.has(c.url) || seen.has(c.url)) return false;
-    seen.add(c.url);
-    return true;
-  });
+  const kept = dedupeByUrl(found, actioned);
 
   const batch: CandidateBatch = {
     subjectId: subject.id,
@@ -240,6 +222,13 @@ async function runJudge(candidatesFile: string): Promise<void> {
 
   const judge = getJudge();
   const relevance = await judge.score(subject, batch.candidates);
+  if (relevance.length === 0 && batch.candidates.length > 0) {
+    console.error(
+      `judge: WARNING — scored 0 of ${batch.candidates.length} candidates. ` +
+        "Every scoring batch failed (see errors above); the review queue will be empty. " +
+        "This is NOT the same as 'no relevant candidates'.",
+    );
+  }
   const ranked: ScoredCandidate[] = rankCandidates(batch.candidates, relevance);
 
   const drafts = await judge.draft(subject, ranked);
@@ -293,12 +282,7 @@ async function cmdRecord(): Promise<void> {
   // run) are new. The checklist lists exactly these, so re-running `record`
   // never tells you to re-post something you've already posted.
   const existing = await loadActionedUrls();
-  const seen = new Set<string>();
-  const fresh = approved.filter((row) => {
-    if (existing.has(row.url) || seen.has(row.url)) return false;
-    seen.add(row.url);
-    return true;
-  });
+  const fresh = dedupeByUrl(approved, existing);
 
   const ts = new Date().toISOString();
   const entries: LedgerEntry[] = fresh.map((row) => ({
