@@ -141,7 +141,7 @@ Both actors are run via `apify-client`; its `actor(id).call(input)` starts the r
 
 **X — `apidojo/tweet-scraper`** input:
 ```jsonc
-{ "searchTerms": ["<subject.queries.x> since:<today-14d>"],
+{ "searchTerms": ["<subject.queries.x> since:<today-7d>"],
   "sort": "Latest", "maxItems": 50 }
 ```
 Date is appended as a `since:` operator because the verified caveat is that date filtering works on the `searchTerms` path (not with `twitterHandles`).
@@ -149,8 +149,10 @@ Date is appended as a `since:` operator because the verified caveat is that date
 **LinkedIn — `harvestapi/linkedin-post-search`** input:
 ```jsonc
 { "searchQueries": ["<subject.queries.linkedin>"],
-  "postedLimit": "month", "sortBy": "relevance", "maxPosts": 50 }
+  "postedLimit": "week", "sortBy": "relevance", "maxPosts": 50 }
 ```
+
+**Recency window: ≤ 1 week on both platforms** (X `since:<today-7d>`, LinkedIn `postedLimit: "week"`). The point of the tool is to join *active* conversations, and a thread older than a week is rarely still live — so we search as narrow as the actors allow. Tunable in `config.ts` (`search.x.sinceDays`, `search.linkedin.postedLimit`); `harvestapi` also supports even tighter `24h`/`1h` if a topic is hot.
 
 **Normalization** maps each actor's output to `Candidate` defensively (actor field names drift — use optional chaining + fallbacks). X has no `views`; xquik (alt) does. After normalization, drop any candidate whose `url` is already in the ledger.
 
@@ -252,6 +254,6 @@ From a clean checkout with only `APIFY_TOKEN` set and `claude` logged in:
 
 ## 16. Open questions
 
-- Default search window per platform (X 14d / LinkedIn `month`) — confirm after first real runs.
+- Search window is ≤ 1 week on both platforms (X 7d / LinkedIn `week`); revisit only if real runs return too few candidates to be useful.
 - Whether to also pull X reply threads in v1 or defer (currently deferred to Phase 2).
 - Whether `record` should rewrite the CSV to mark recorded rows, or rely solely on ledger dedup (currently: ledger dedup only).
