@@ -1,5 +1,6 @@
 import type { Subject } from "../types.js";
 import { buildQueries } from "./index.js";
+import { asString, asStringArray, dedupe } from "./text.js";
 
 const GITHUB_API = "https://api.github.com";
 const HEADERS = {
@@ -129,25 +130,3 @@ function significantWords(text: string): string[] {
     .filter((w) => w.length > 1 && !STOPWORDS.has(w.toLowerCase()));
 }
 
-function asString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((v): v is string => typeof v === "string").map((v) => v.trim());
-}
-
-/** De-duplicate case-insensitively while preserving first-seen order/casing. */
-function dedupe(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const v of values) {
-    if (!v) continue;
-    const key = v.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(v);
-  }
-  return out;
-}

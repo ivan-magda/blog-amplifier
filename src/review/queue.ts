@@ -5,7 +5,7 @@ import { parse } from "csv-parse/sync";
 import { stringify } from "csv-stringify/sync";
 
 import { config } from "../config.js";
-import type { Platform, ScoredCandidate } from "../types.js";
+import { PLATFORMS, type Platform, type ScoredCandidate } from "../types.js";
 
 /** CSV column order for the human-review queue (PRD §9). Do not reorder. */
 const COLUMNS = [
@@ -71,16 +71,23 @@ export async function appendToReviewQueue(
   const file = opts?.file ?? config.paths.reviewQueue;
   const records = rows.map((row) => toRecord(row, meta));
 
-  let exists = true;
+  // Write the header when the file is missing OR empty. A 0-byte file (from an
+  // interrupted append or a manual `touch`) must still get a header — otherwise
+  // the first data row is parsed AS the header and that approved row is lost.
+  let needHeader = true;
   try {
-    await fs.access(file);
+    const st = await fs.stat(file);
+    needHeader = st.size === 0;
   } catch {
-    exists = false;
+    needHeader = true;
   }
 
   const csv = stringify(records, {
-    header: !exists,
+    header: needHeader,
     columns: COLUMNS as unknown as string[],
+    // Neutralize spreadsheet formula injection: scraped author/text/draft cells
+    // that begin with = + - @ are prefixed so Excel/Sheets won't execute them.
+    escape_formulas: true,
   });
 
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -120,13 +127,23 @@ export async function readApprovedRows(opts?: { file?: string }): Promise<Approv
   for (const rec of records) {
     if (String(rec.decision ?? "").trim().toLowerCase() !== "approve") continue;
 
+    // Validate the platform against the runtime source of truth before
+    // narrowing — the CSV is hand-edited, so the cell is untrusted.
+    const platform = String(rec.platform ?? "").trim().toLowerCase();
+    if (!PLATFORMS.includes(platform as Platform)) {
+      console.error(
+        `review: skipping approved row with invalid platform "${rec.platform ?? ""}" (url: ${rec.url ?? ""})`,
+      );
+      continue;
+    }
+
     const finalComment = rec.final_comment;
     const comment =
       finalComment && finalComment.trim() ? finalComment : (rec.draft_comment ?? "");
 
     approved.push({
       subjectId: rec.subject_id ?? "",
-      platform: rec.platform as Platform,
+      platform: platform as Platform,
       url: rec.url ?? "",
       comment,
     });

@@ -2,10 +2,6 @@ import type { Candidate, Platform, Subject } from "../types.js";
 import { discoverLinkedIn } from "./linkedin.js";
 import { discoverTwitter } from "./twitter.js";
 
-export { runActor } from "./apify.js";
-export { discoverTwitter } from "./twitter.js";
-export { discoverLinkedIn } from "./linkedin.js";
-
 /**
  * Discover candidates for a subject across the requested platforms and
  * concatenate the results. Unknown platforms are ignored.

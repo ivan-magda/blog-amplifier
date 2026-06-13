@@ -6,7 +6,7 @@ It is built on one principle: discovery and commenting are separate problems. Ev
 
 ## Safety model
 
-- **Read-only, cookie-free discovery.** Discovery runs through Apify actors (apidojo for X, HarvestAPI for LinkedIn) that need no login and no cookies. Your personal accounts are never handed to any tool.
+- **Read-only, cookie-free discovery.** Discovery runs through Apify actors (xquik for X, HarvestAPI for LinkedIn) that need no login and no cookies. Your personal accounts are never handed to any tool. xquik is the default because it runs on Apify's **free plan**; swap to `apidojo/tweet-scraper` (higher-trust, same output fields) on a paid plan via `src/config.ts`.
 - **Mandatory human review.** Every surfaced candidate lands in `data/review-queue.csv`. Nothing proceeds until you set the `decision` column by hand.
 - **Manual posting.** The tool never posts. `record` prints a checklist; you post the approved comments yourself, at a human pace.
 - **Ledger idempotency.** Every recorded action is appended to `data/actions.log.jsonl`. Re-running `record` never double-records, and a later `discover` run never re-surfaces a URL you have already engaged.

@@ -85,9 +85,15 @@ function requireString(flags: Flags, key: string): string {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Filesystem-safe ISO-ish timestamp, e.g. 2026-06-13T08-30-00-000Z. */
+/**
+ * Filesystem-safe ISO-ish timestamp with a short random suffix, e.g.
+ * 2026-06-13T08-30-00-000Z-a1b2. The suffix prevents two same-millisecond runs
+ * of one subject from overwriting each other's output. Always begins with the
+ * 4-digit year, which resolveCandidatesFile relies on.
+ */
 function stamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, "-");
+  const iso = new Date().toISOString().replace(/[:.]/g, "-");
+  return `${iso}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
 /** Resolve `--platform x|linkedin|both` (default both) to a Platform[]. */
@@ -122,7 +128,13 @@ async function resolveCandidatesFile(run: string): Promise<string> {
   const all = entries.filter((f) => f.endsWith(".candidates.json")).sort();
 
   if (run !== "latest") {
-    const matches = all.filter((f) => f.startsWith(`${run}-`));
+    // Require the segment after `<id>-` to be a timestamp (starts with a 4-digit
+    // year), so `--run wwdc26-notes` can't match `wwdc26-notes-deep-dive-...`
+    // and `--run foo` can't match a different subject that merely shares `foo-`.
+    const prefix = `${run}-`;
+    const matches = all.filter(
+      (f) => f.startsWith(prefix) && /^\d{4}-/.test(f.slice(prefix.length)),
+    );
     const newest = matches.at(-1);
     if (newest) return path.join(dir, newest);
   }
@@ -187,8 +199,15 @@ async function runDiscover(flags: Flags): Promise<{ id: string; file: string }> 
   const subject = await loadSubject(id);
   const found = await discover(subject, platforms);
 
+  // Drop URLs already actioned (ledger dedup) AND duplicates within this batch
+  // (actors can return the same post twice; a URL can appear on both platforms).
   const actioned = await loadActionedUrls();
-  const kept = found.filter((c) => !actioned.has(c.url));
+  const seen = new Set<string>();
+  const kept = found.filter((c) => {
+    if (actioned.has(c.url) || seen.has(c.url)) return false;
+    seen.add(c.url);
+    return true;
+  });
 
   const batch: CandidateBatch = {
     subjectId: subject.id,
@@ -270,8 +289,19 @@ async function cmdRecord(): Promise<void> {
     return;
   }
 
+  // Only the rows not already in the ledger (and not duplicated within this
+  // run) are new. The checklist lists exactly these, so re-running `record`
+  // never tells you to re-post something you've already posted.
+  const existing = await loadActionedUrls();
+  const seen = new Set<string>();
+  const fresh = approved.filter((row) => {
+    if (existing.has(row.url) || seen.has(row.url)) return false;
+    seen.add(row.url);
+    return true;
+  });
+
   const ts = new Date().toISOString();
-  const entries: LedgerEntry[] = approved.map((row) => ({
+  const entries: LedgerEntry[] = fresh.map((row) => ({
     ts,
     subjectId: row.subjectId,
     platform: row.platform,
@@ -283,15 +313,20 @@ async function cmdRecord(): Promise<void> {
   const recorded = await appendLedger(entries);
   console.log(
     `Recorded ${recorded} new action(s) to ${config.paths.ledger} ` +
-      `(${approved.length - recorded} already present, skipped).`,
+      `(${approved.length - recorded} already recorded or duplicate, skipped).`,
   );
 
+  if (fresh.length === 0) {
+    console.log("\nNothing new to post — every approved row is already in the ledger.");
+    return;
+  }
+
   console.log("\n=== POST THESE MANUALLY ===");
-  for (const row of approved) {
+  for (const row of fresh) {
     console.log(`\n[${row.platform}] ${row.url}`);
     console.log(`  ${row.comment}`);
   }
-  console.log("\n(Re-running `record` is safe — the ledger dedups by URL.)");
+  console.log("\n(Re-running `record` is safe — already-recorded rows are skipped.)");
 }
 
 async function cmdPipeline(flags: Flags): Promise<void> {

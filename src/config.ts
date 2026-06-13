@@ -59,7 +59,9 @@ export const config = {
   /** How far back to search, per platform. Kept tight (≤1 week) to surface
    *  conversations that are still active. harvestapi also allows "24h"/"1h". */
   search: {
-    x: { sinceDays: 7, lang: "en" },
+    // The X query language is fixed to lang:en inside buildQueries (extract);
+    // only sinceDays is read here.
+    x: { sinceDays: 7 },
     linkedin: { postedLimit: "week" as const, sortBy: "relevance" as const },
   },
 

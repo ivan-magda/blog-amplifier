@@ -27,8 +27,15 @@ export async function loadActionedUrls(opts?: { file?: string }): Promise<Set<st
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (trimmed === "") continue;
-    const entry = JSON.parse(trimmed) as LedgerEntry;
-    if (entry.url) urls.add(entry.url);
+    // Skip a corrupt/partial line (e.g. an interrupted append or a hand-edit)
+    // rather than throwing — one bad line must not disable dedup/idempotency
+    // for the whole ledger, which is the tool's core safety guarantee.
+    try {
+      const entry = JSON.parse(trimmed) as LedgerEntry;
+      if (entry.url) urls.add(entry.url);
+    } catch {
+      console.error(`ledger: skipping unparseable line in ${file}: ${trimmed.slice(0, 120)}`);
+    }
   }
 
   return urls;

@@ -1,22 +1,7 @@
 import { config } from "../config.js";
 import type { Candidate, Subject } from "../types.js";
 import { runActor } from "./apify.js";
-
-/** Coerce an unknown value to a finite number, defaulting to 0. */
-function num(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** Coerce an unknown value to a string, or undefined if absent. */
-function str(v: unknown): string | undefined {
-  return typeof v === "string" ? v : v == null ? undefined : String(v);
-}
-
-/** Pick the first nested record under a key, if any (e.g. `it.author`). */
-function obj(v: unknown): Record<string, unknown> | undefined {
-  return v && typeof v === "object" ? (v as Record<string, unknown>) : undefined;
-}
+import { num, obj, str } from "./normalize.js";
 
 /**
  * Discover recent LinkedIn posts matching the subject's query via the
@@ -61,12 +46,10 @@ export async function discoverLinkedIn(subject: Subject): Promise<Candidate[]> {
       likes: num(eng?.likes ?? it.reactionsCount ?? it.likes),
       replies: num(eng?.comments ?? it.commentsCount),
       reposts: num(eng?.shares ?? it.reposts),
+      // No usable timestamp -> leave empty so recencyScore treats it as unknown
+      // (score 0) rather than rewarding missing metadata with a "brand new" boost.
       createdAt:
-        str(posted?.date) ??
-        postedAtStr ??
-        str(it.date) ??
-        str(it.createdAt) ??
-        new Date().toISOString(),
+        str(posted?.date) ?? postedAtStr ?? str(it.date) ?? str(it.createdAt) ?? "",
     });
   }
 

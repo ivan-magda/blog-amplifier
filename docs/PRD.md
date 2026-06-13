@@ -80,7 +80,7 @@ log/ledger                            (record → data/actions.log.jsonl : idemp
 | `extract/github.ts` | Repo meta + README → `Subject` | `owner/name` → `Subject` | GitHub REST (no auth) |
 | `extract/index.ts` | Subject load/save/list, query builder | — | — |
 | `discover/apify.ts` | Run an actor, return dataset items | `(actorId, input)` → `unknown[]` | `apify-client` |
-| `discover/twitter.ts` | Build apidojo input + normalize | `Subject` → `Candidate[]` | — |
+| `discover/twitter.ts` | Build xquik (default) / apidojo input + normalize | `Subject` → `Candidate[]` | — |
 | `discover/linkedin.ts` | Build harvestapi input + normalize | `Subject` → `Candidate[]` | — |
 | `judge/index.ts` | `Judge` interface + factory | — | — |
 | `judge/claude-cli.ts` | `claude -p` score + draft | `(Subject, Candidate[])` → relevance/drafts | `claude` CLI |
@@ -139,10 +139,10 @@ interface LedgerEntry {
 
 Both actors are run via `apify-client`; its `actor(id).call(input)` starts the run, waits for completion, and returns the run — then `dataset(run.defaultDatasetId).listItems()` returns the items. (This wraps the verified async start → poll → fetch-dataset flow; runs routinely exceed the 5-min sync limit.)
 
-**X — `apidojo/tweet-scraper`** input:
+**X — `xquik/x-tweet-scraper`** (v1 default — runs on Apify's free plan; swap to `apidojo/tweet-scraper` on a paid plan, same output fields) input:
 ```jsonc
 { "searchTerms": ["<subject.queries.x> since:<today-7d>"],
-  "sort": "Latest", "maxItems": 50 }
+  "maxItems": 50 }
 ```
 Date is appended as a `since:` operator because the verified caveat is that date filtering works on the `searchTerms` path (not with `twitterHandles`).
 
@@ -154,7 +154,7 @@ Date is appended as a `since:` operator because the verified caveat is that date
 
 **Recency window: ≤ 1 week on both platforms** (X `since:<today-7d>`, LinkedIn `postedLimit: "week"`). The point of the tool is to join *active* conversations, and a thread older than a week is rarely still live — so we search as narrow as the actors allow. Tunable in `config.ts` (`search.x.sinceDays`, `search.linkedin.postedLimit`); `harvestapi` also supports even tighter `24h`/`1h` if a topic is hot.
 
-**Normalization** maps each actor's output to `Candidate` defensively (actor field names drift — use optional chaining + fallbacks). X has no `views`; xquik (alt) does. After normalization, drop any candidate whose `url` is already in the ledger.
+**Normalization** maps each actor's output to `Candidate` defensively (actor field names drift — use optional chaining + fallbacks). xquik exposes `views` (apidojo does not). After normalization, drop any candidate whose `url` is already in the ledger **and** any intra-batch duplicate URLs.
 
 ---
 
@@ -210,7 +210,7 @@ Append-only JSONL, one `LedgerEntry` per posted comment. Two jobs: **idempotency
 
 ## 12. Safety & ToS posture
 
-- **Discovery is cookie-free + read-only** (apidojo, HarvestAPI) → your personal accounts are never in scope. Scraping still breaches platform ToS in principle; volume is tiny and read-only, the defensible end of the spectrum.
+- **Discovery is cookie-free + read-only** (xquik, HarvestAPI) → your personal accounts are never in scope. Scraping still breaches platform ToS in principle; volume is tiny and read-only, the defensible end of the spectrum.
 - **Mandatory human gate**; **manual, human-paced posting** (a few thoughtful comments/day, not bursts). Matches X's ban on automated/keyword-triggered engagement.
 - **AI drafts, human edits** — add a genuine technical point, lead with value not the link, never mass-post near-identical comments (platform + FTC pressure on AI endorsements).
 - Don't republish scraped datasets; store only what's needed. *Not legal advice.*
@@ -235,7 +235,7 @@ From a clean checkout with only `APIFY_TOKEN` set and `claude` logged in:
 - **GitHub Actions**: discovery on blog-publish (push to posts path) + weekly cron, uploading a candidates artifact you judge locally.
 - **Judge fallbacks**: `embeddings` (local MiniLM, ranking only) and/or `ollama` (local LLM, judge+draft) backends behind the existing `Judge` interface — for unattended/CI runs.
 - **X reply-thread enrichment** (`apidojo` sibling / replies scraper) to find the liveliest sub-conversations under a high-signal tweet.
-- **Alt actors as config flips**: `xquik/x-tweet-scraper` ($0.15/1k, exposes `views`); `scary_good_apis` LinkedIn fallback.
+- **Alt actors as config flips**: `apidojo/tweet-scraper` for X on a paid plan (higher-trust; the v1 default `xquik` is the free-plan choice); `scary_good_apis` LinkedIn fallback.
 
 ---
 

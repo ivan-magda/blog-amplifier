@@ -21,6 +21,9 @@ export async function runActor(
 
   const client = new ApifyClient({ token });
   const run = await client.actor(actorId).call(input);
+  // `opts.maxItems` is a belt-and-suspenders fetch-side cap: callers also pass
+  // the cap in the actor input (maxItems/maxPosts) to bound run cost, but actors
+  // don't always honor it, so we also limit what we read from the dataset.
   const { items } = await client
     .dataset(run.defaultDatasetId)
     .listItems(opts?.maxItems ? { limit: opts.maxItems } : {});
