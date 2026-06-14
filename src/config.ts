@@ -40,7 +40,7 @@ export const config = {
     // account required, read-only.
     linkedin: {
       id: "harvestapi/linkedin-post-search",
-      maxItems: 50,
+      maxItems: 100,
     },
   },
 
