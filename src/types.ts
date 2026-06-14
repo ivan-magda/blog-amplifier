@@ -33,6 +33,10 @@ export interface Subject {
    */
   focus?: string;
   notSubject?: string[];
+  /**
+   * Handles/names of the subject owner to exclude from discovery — you don't promote a post by replying to your own.
+   */
+  ownerHandles?: string[];
   /** Provenance for auto-generated disambiguation, so a human knows to verify it. */
   enrichment?: { source: "manual" | "auto"; model?: string; at?: string };
 }

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { dedupeByUrl, selectCandidatesFile } from "./cli-helpers.js";
+import { dedupeByUrl, dropOwnerAuthors, selectCandidatesFile } from "./cli-helpers.js";
 
 const T = "2026-06-13T08-30-00-000Z-a1b2"; // a stamp()-shaped suffix
 const files = [
@@ -45,4 +45,41 @@ test("dedupeByUrl drops intra-list duplicates and anything in the exclude set", 
     ["https://a/1", "https://a/3"],
   );
   assert.ok(exclude.has("https://a/2") && exclude.size === 1, "exclude set must not be mutated");
+});
+
+test("dropOwnerAuthors removes the owner across handle/name variants and platforms", () => {
+  const items = [
+    { author: "magda_ivan", url: "x1" }, // X handle
+    { author: "Ivan Magda", url: "li1" }, // LinkedIn display name
+    { author: "ivanmagda", url: "li2" }, // LinkedIn slug
+    { author: "someoneElse", url: "x2" },
+    { author: "@Magda_Ivan", url: "x3" }, // leading @ + different case
+  ];
+  const out = dropOwnerAuthors(items, ["magda_ivan", "ivan-magda", "Ivan Magda"]);
+  assert.deepEqual(
+    out.map((i) => i.url),
+    ["x2"],
+    "every owner variant is dropped; unrelated authors stay",
+  );
+});
+
+test("dropOwnerAuthors is a no-op with no owner handles (clean subjects unchanged)", () => {
+  const items = [{ author: "anyone", url: "a" }];
+  assert.equal(dropOwnerAuthors(items, []).length, 1);
+  assert.equal(dropOwnerAuthors(items).length, 1);
+});
+
+test("dropOwnerAuthors catches a decorated display name but spares a homonym and empty authors", () => {
+  const items = [
+    { author: "Ivan Magda | iOS @ Acme", url: "li1" }, // owner with a title suffix
+    { author: "Ivan Magda (He/Him)", url: "li2" }, // owner with a pronoun suffix
+    { author: "Ivan Magdalena", url: "li3" }, // DIFFERENT person — must stay
+    { author: "", url: "li4" }, // scraper default empty author — must stay
+  ];
+  const out = dropOwnerAuthors(items, ["Ivan Magda", "magda_ivan"]);
+  assert.deepEqual(
+    out.map((i) => i.url),
+    ["li3", "li4"],
+    "owner variants dropped; a different real person and empty-author rows are kept",
+  );
 });

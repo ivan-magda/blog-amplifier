@@ -114,12 +114,17 @@ async function main() {
     gateMode: "off",
     engagementNormalization: "batch",
     tiebreakViewsWeight: 0,
+    // Reproduce the ORIGINAL blend: dedupeByAuthor now defaults true in config,
+    // so pin it off here or the baseline silently dedups too and the A/B can't
+    // isolate any one change.
+    dedupeByAuthor: false,
   });
   const after = rankCandidates(candidates, relNew, {
     now,
     gateMode: "drop_off_topic",
     engagementNormalization: "per_platform",
     tiebreakViewsWeight: 0.03,
+    dedupeByAuthor: true,
   });
 
   summary("BASELINE (current pipeline)", baseline);

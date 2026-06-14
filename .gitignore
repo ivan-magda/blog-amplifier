@@ -7,16 +7,19 @@
 node_modules/
 .pnp.*
 
-# Pipeline outputs / scraped data (ignore everything but the dir placeholder)
+# Pipeline outputs / scraped data
 data/*
 !data/.gitkeep
 
-# Subjects you create (ship only the example template, keep your own private)
+# Subjects you create
 subjects/*
 !subjects/example.json
 
 # Tooling scratch
 .playwright-mcp/
+
+# Session-local one-off
+scripts/finalize-review-queue.ts
 
 # OS / editor
 .DS_Store

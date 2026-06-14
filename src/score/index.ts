@@ -19,6 +19,8 @@ export interface RankOptions {
   engagementNormalization?: "batch" | "per_platform";
   /** Weight of the X-only views tiebreaker (0 = off). */
   tiebreakViewsWeight?: number;
+  /** Keep at most one row per author in the surfaced top-N (see config.dedupeByAuthor). */
+  dedupeByAuthor?: boolean;
 }
 
 /**
@@ -30,8 +32,9 @@ export interface RankOptions {
  * default) can drop keyword-collision posts the judge marked off_topic/adjacent
  * before the blend, and a small X-only views tiebreaker (weight 0 by default)
  * can reorder surviving X candidates. With identity defaults this is the
- * original blend. The returned `draft` is left undefined — drafting happens
- * later, over the surfaced top-N only.
+ * original blend EXCEPT for author dedup, which defaults on (config.dedupeByAuthor)
+ * and keeps only each author's highest-scored row in the top-N. The returned
+ * `draft` is left undefined — drafting happens later, over the surfaced top-N only.
  */
 export function rankCandidates(
   candidates: Candidate[],
@@ -42,6 +45,7 @@ export function rankCandidates(
   const relevanceFloor = opts.relevanceFloor ?? config.gate.relevanceFloor;
   const normalization = opts.engagementNormalization ?? config.engagementNormalization;
   const viewsWeight = opts.tiebreakViewsWeight ?? config.tiebreakViewsWeight;
+  const dedupeAuthors = opts.dedupeByAuthor ?? config.dedupeByAuthor;
 
   const relByIndex = new Map<number, RelevanceResult>();
   for (const r of relevance) relByIndex.set(r.index, r);
@@ -77,7 +81,30 @@ export function rankCandidates(
 
   applyViewsTiebreaker(survivors, viewsWeight);
 
-  return survivors.sort((a, b) => b.score - a.score).slice(0, config.topN);
+  const ranked = survivors.sort((a, b) => b.score - a.score);
+  const deduped = dedupeAuthors ? keepHighestPerAuthor(ranked) : ranked;
+  return deduped.slice(0, config.topN);
+}
+
+/**
+ * Keep only the highest-scored row per author. Input must be pre-sorted by score
+ * descending, so the first time an author is seen is their best post. Rows with
+ * an empty/missing author are never collapsed (each is kept) — absent author is
+ * "unknown", not "the same person". Stops one prolific account from filling the
+ * review queue, which would read as spam when posted.
+ */
+function keepHighestPerAuthor(rows: ScoredCandidate[]): ScoredCandidate[] {
+  const seen = new Set<string>();
+  const out: ScoredCandidate[] = [];
+  for (const r of rows) {
+    const key = r.author?.trim().toLowerCase();
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push(r);
+  }
+  return out;
 }
 
 /** Whether the relevance gate drops this candidate. Identity at mode "off" + floor 0. */

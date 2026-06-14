@@ -8,7 +8,10 @@ const NOW = new Date("2026-06-13T00:00:00Z");
 function cand(over: Partial<Candidate> & { url: string }): Candidate {
   return {
     platform: "x",
-    author: "a",
+    // Default author to the url so multi-candidate fixtures have DISTINCT
+    // authors — otherwise the author-dedup pass (on by default) would collapse
+    // them. Tests that exercise dedup set `author` explicitly.
+    author: over.url,
     text: "t",
     likes: 0,
     replies: 0,
@@ -92,6 +95,41 @@ test("per-platform engagement normalization normalizes within each platform", ()
   // per-platform: li is the only linkedin row, so it normalizes to 0
   assert.equal(find(perPlat, "li")?.engagementScore, 0, "lone linkedin row normalizes to 0 within its platform");
   assert.equal(find(perPlat, "x2")?.engagementScore, 1, "top x row normalizes to 1 within x");
+});
+
+test("author dedup (default on) keeps only an author's highest-scored row", () => {
+  // Two posts from the same author; the one with more engagement scores higher.
+  const cands = [
+    cand({ url: "lo", author: "dup", likes: 0 }),
+    cand({ url: "hi", author: "dup", likes: 100 }),
+    cand({ url: "other", author: "someoneElse", likes: 0 }),
+  ];
+  const rel: RelevanceResult[] = cands.map((_, i) => ({ index: i, relevance: 90, rationale: "" }));
+
+  const out = rankCandidates(cands, rel, { now: NOW });
+  assert.ok(find(out, "hi"), "the author's higher-scored post is kept");
+  assert.equal(find(out, "lo"), undefined, "the author's lower-scored duplicate is dropped");
+  assert.ok(find(out, "other"), "a different author is unaffected");
+});
+
+test("author dedup never collapses empty-author rows (each is kept)", () => {
+  // Both scrapers default author to "" when absent; those rows are distinct
+  // posts, not "the same author", so dedup must NOT fold them into one.
+  const cands = [cand({ url: "a", author: "" }), cand({ url: "b", author: "" })];
+  const rel: RelevanceResult[] = cands.map((_, i) => ({ index: i, relevance: 90, rationale: "" }));
+  const out = rankCandidates(cands, rel, { now: NOW });
+  assert.ok(find(out, "a") && find(out, "b"), "two author-less posts both survive dedup");
+});
+
+test("author dedup can be turned off via opts", () => {
+  const cands = [
+    cand({ url: "lo", author: "dup", likes: 0 }),
+    cand({ url: "hi", author: "dup", likes: 100 }),
+  ];
+  const rel: RelevanceResult[] = cands.map((_, i) => ({ index: i, relevance: 90, rationale: "" }));
+
+  const out = rankCandidates(cands, rel, { now: NOW, dedupeByAuthor: false });
+  assert.ok(find(out, "hi") && find(out, "lo"), "both same-author rows survive when dedup is off");
 });
 
 test("views tiebreaker lifts the higher-views X row only when weight > 0", () => {

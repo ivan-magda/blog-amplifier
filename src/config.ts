@@ -81,6 +81,11 @@ export const config = {
   tiebreakViewsWeight: 0,
   /** How many top candidates to draft comments for and surface for review. */
   topN: 15,
+  /** Keep at most one row per author in the surfaced top-N (highest-scored wins),
+   *  applied after gating/sorting and before the topN cut. Stops one prolific
+   *  account from eating several review slots — replying to the same person many
+   *  times in a batch reads as spam. Opt-out per call via RankOptions. */
+  dedupeByAuthor: true,
   /** How far back to search, per platform. Kept tight (≤1 week) to surface
    *  conversations that are still active. harvestapi also allows "24h"/"1h". */
   search: {

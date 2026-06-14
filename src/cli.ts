@@ -28,7 +28,7 @@ import { rankCandidates } from "./score/index.js";
 import { appendToReviewQueue, readApprovedRows } from "./review/queue.js";
 import { appendLedger, loadActionedUrls } from "./log/ledger.js";
 import { enrichSubject } from "./enrich.js";
-import { dedupeByUrl, selectCandidatesFile } from "./cli-helpers.js";
+import { dedupeByUrl, dropOwnerAuthors, selectCandidatesFile } from "./cli-helpers.js";
 import { PLATFORMS } from "./types.js";
 import type {
   CandidateBatch,
@@ -225,7 +225,12 @@ async function runDiscover(flags: Flags): Promise<{ id: string; file: string }> 
   // Drop URLs already actioned (ledger dedup) AND duplicates within this batch
   // (actors can return the same post twice; a URL can appear on both platforms).
   const actioned = await loadActionedUrls();
-  const kept = dedupeByUrl(found, actioned);
+  const deduped = dedupeByUrl(found, actioned);
+  // Drop the subject owner's own posts (you don't promote by replying to
+  // yourself). On X the `-from:` query operator already keeps most of these out;
+  // this also covers LinkedIn (no `from:` operator) and is a cross-platform net.
+  const kept = dropOwnerAuthors(deduped, subject.ownerHandles);
+  const ownerDropped = deduped.length - kept.length;
 
   const batch: CandidateBatch = {
     subjectId: subject.id,
@@ -238,7 +243,9 @@ async function runDiscover(flags: Flags): Promise<{ id: string; file: string }> 
 
   console.log(
     `discover [${platforms.join(", ")}]: found ${found.length}, ` +
-      `kept ${kept.length} after ledger dedup → ${file}`,
+      `kept ${kept.length} after ledger dedup` +
+      (ownerDropped > 0 ? ` (+${ownerDropped} owner post(s) excluded)` : "") +
+      ` → ${file}`,
   );
   return { id, file };
 }
