@@ -96,3 +96,13 @@ test("numberCandidates neutralizes a forged closing fence marker in candidate te
   const endMarkers = prompt.split("<<<CANDIDATES_END>>>").length - 1;
   assert.equal(endMarkers, 1, "only the real fence marker should remain; the forged one is defanged");
 });
+
+test("numberCandidates sends the full post text, untruncated", async () => {
+  // A long curated/listicle post must reach the judge whole — clipping it once
+  // made the judge misread item 1 of a roundup as the poster's own claim.
+  const judge = new StubJudge(relevanceEcho(50));
+  const long = "Z".repeat(1500); // far beyond the old 240-char cap
+  await judge.score(SUBJECT, cands(1, () => ({ text: long })));
+  const prompt = judge.prompts[0] ?? "";
+  assert.ok(prompt.includes(long), "the entire candidate text reaches the judge prompt");
+});

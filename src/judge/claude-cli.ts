@@ -269,9 +269,6 @@ export class ClaudeCliJudge implements Judge {
   }
 }
 
-/** Max characters of candidate text to include per line in a judge prompt. */
-const CANDIDATE_TEXT_LIMIT = 240;
-
 /** Fence markers delimiting the untrusted candidate block in judge prompts. */
 const CANDIDATES_BEGIN = "<<<CANDIDATES_BEGIN>>>";
 const CANDIDATES_END = "<<<CANDIDATES_END>>>";
@@ -283,9 +280,14 @@ const SCORE_BATCH = 25;
  *  because each draft is a full comment (more output tokens => slower). */
 const DRAFT_BATCH = 8;
 
-/** Render candidates as a numbered `INDEX: [platform] text` list (text trimmed).
- *  Neutralizes any fence markers embedded in the untrusted text so a candidate
- *  can't forge `<<<CANDIDATES_END>>>` to break out of the data fence. */
+/** Render candidates as a numbered `INDEX: [platform] text` list. Sends the FULL
+ *  post text (no truncation) so the judge can see multi-author roundups, quotes,
+ *  and long threads in full — a 240-char cap once made it misread a curated
+ *  listicle as the poster's own claim and address the wrong author. Whitespace
+ *  is collapsed for prompt cleanliness; fence markers in the untrusted text are
+ *  neutralized so a candidate can't forge `<<<CANDIDATES_END>>>` to break out of
+ *  the data fence. Cost is bounded by batching, not per-post truncation (the
+ *  judge is a `claude -p` subscription, and timeouts scale with output, not input). */
 function numberCandidates(candidates: Candidate[]): string {
   return candidates
     .map((c, i) => {
@@ -293,8 +295,7 @@ function numberCandidates(candidates: Candidate[]): string {
         .replaceAll(CANDIDATES_BEGIN, "[begin]")
         .replaceAll(CANDIDATES_END, "[end]")
         .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, CANDIDATE_TEXT_LIMIT);
+        .trim();
       return `${i}: [${c.platform}] ${text}`;
     })
     .join("\n");
