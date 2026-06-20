@@ -1,7 +1,12 @@
 import { spawn } from "node:child_process";
 import { z, type ZodType } from "zod";
 import { config } from "../config.js";
-import type { Subject, Candidate, RelevanceResult, DraftResult } from "../types.js";
+import type {
+  Subject,
+  Candidate,
+  RelevanceResult,
+  DraftResult,
+} from "../types.js";
 import type { Judge } from "./index.js";
 
 /** Zod shape for the `score()` JSON array the model must return. */
@@ -32,7 +37,10 @@ const draftArraySchema = z.array(
  * validated with zod (one stricter-prompt retry on invalid JSON, per PRD §7).
  */
 export class ClaudeCliJudge implements Judge {
-  async score(subject: Subject, candidates: Candidate[]): Promise<RelevanceResult[]> {
+  async score(
+    subject: Subject,
+    candidates: Candidate[],
+  ): Promise<RelevanceResult[]> {
     if (candidates.length === 0) return [];
 
     // Score in parallel batches: one `claude -p` call per ~25 candidates keeps
@@ -41,7 +49,10 @@ export class ClaudeCliJudge implements Judge {
     // them by the chunk's start position to map back to the full array.
     const chunks: Array<{ start: number; chunk: Candidate[] }> = [];
     for (let start = 0; start < candidates.length; start += SCORE_BATCH) {
-      chunks.push({ start, chunk: candidates.slice(start, start + SCORE_BATCH) });
+      chunks.push({
+        start,
+        chunk: candidates.slice(start, start + SCORE_BATCH),
+      });
     }
 
     // allSettled, not all: a single flaky `claude` chunk must not discard the
@@ -71,13 +82,21 @@ export class ClaudeCliJudge implements Judge {
       }
       const c = chunks[i];
       const range = c ? `${c.start}–${c.start + c.chunk.length - 1}` : `#${i}`;
-      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      console.error(`judge: scoring chunk ${range} failed, skipping it — ${reason}`);
+      const reason =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      console.error(
+        `judge: scoring chunk ${range} failed, skipping it — ${reason}`,
+      );
     });
     return out;
   }
 
-  async draft(subject: Subject, candidates: Candidate[]): Promise<DraftResult[]> {
+  async draft(
+    subject: Subject,
+    candidates: Candidate[],
+  ): Promise<DraftResult[]> {
     if (candidates.length === 0) return [];
 
     // Batch + allSettled like score(): drafting many full comments in one call
@@ -86,7 +105,10 @@ export class ClaudeCliJudge implements Judge {
     // review queue without an AI draft — the human can still write the comment.
     const chunks: Array<{ start: number; chunk: Candidate[] }> = [];
     for (let start = 0; start < candidates.length; start += DRAFT_BATCH) {
-      chunks.push({ start, chunk: candidates.slice(start, start + DRAFT_BATCH) });
+      chunks.push({
+        start,
+        chunk: candidates.slice(start, start + DRAFT_BATCH),
+      });
     }
 
     const settled = await Promise.allSettled(
@@ -107,8 +129,13 @@ export class ClaudeCliJudge implements Judge {
       }
       const c = chunks[i];
       const range = c ? `${c.start}–${c.start + c.chunk.length - 1}` : `#${i}`;
-      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
-      console.error(`judge: drafting chunk ${range} failed, skipping it — ${reason}`);
+      const reason =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      console.error(
+        `judge: drafting chunk ${range} failed, skipping it — ${reason}`,
+      );
     });
     return out;
   }
@@ -117,18 +144,23 @@ export class ClaudeCliJudge implements Judge {
    * Run the prompt, parse + validate the result, and on JSON failure retry once
    * with a stricter "return ONLY the JSON array" instruction before throwing.
    */
-  private async runWithRetry<T>(prompt: string, schema: ZodType<T>): Promise<T> {
+  private async runWithRetry<T>(
+    prompt: string,
+    schema: ZodType<T>,
+  ): Promise<T> {
     const first = await this.runClaude(prompt);
     try {
       return this.extractJson(first, schema);
     } catch (firstErr) {
       const retryPrompt =
-        prompt + "\n\nYour previous output was not valid JSON. Return ONLY the JSON array.";
+        prompt +
+        "\n\nYour previous output was not valid JSON. Return ONLY the JSON array.";
       const second = await this.runClaude(retryPrompt);
       try {
         return this.extractJson(second, schema);
       } catch (secondErr) {
-        const detail = secondErr instanceof Error ? secondErr.message : String(secondErr);
+        const detail =
+          secondErr instanceof Error ? secondErr.message : String(secondErr);
         throw new Error(
           `Judge returned invalid JSON after one retry: ${detail}. ` +
             `First attempt error: ${firstErr instanceof Error ? firstErr.message : String(firstErr)}`,
@@ -157,7 +189,9 @@ export class ClaudeCliJudge implements Judge {
   private extractJson<T>(text: string, schema: ZodType<T>): T {
     const slice = sliceToBrackets(text);
     if (slice === null) {
-      throw new Error(`No JSON array/object found in judge output: ${text.trim().slice(0, 300)}`);
+      throw new Error(
+        `No JSON array/object found in judge output: ${text.trim().slice(0, 300)}`,
+      );
     }
 
     let parsed: unknown;
@@ -170,13 +204,17 @@ export class ClaudeCliJudge implements Judge {
 
     const validated = schema.safeParse(parsed);
     if (!validated.success) {
-      throw new Error(`Judge output failed schema validation: ${validated.error.message}`);
+      throw new Error(
+        `Judge output failed schema validation: ${validated.error.message}`,
+      );
     }
     // A chunk always has >=1 candidate, so an empty array is never a complete
     // answer — it usually means the slice locked onto a spurious leading `[]`
     // before the real output. Treat it as failure so runWithRetry re-prompts.
     if (Array.isArray(validated.data) && validated.data.length === 0) {
-      throw new Error("Judge returned an empty array (likely a spurious leading value); retrying.");
+      throw new Error(
+        "Judge returned an empty array (likely a spurious leading value); retrying.",
+      );
     }
     return validated.data;
   }
@@ -244,7 +282,9 @@ export class ClaudeCliJudge implements Judge {
       `Keywords: ${subject.keywords.join(", ")}`,
     ];
     if (subject.focus) {
-      subjectLines.push(`Focus — what this subject specifically is: ${subject.focus}`);
+      subjectLines.push(
+        `Focus — what this subject specifically is: ${subject.focus}`,
+      );
     }
     subjectLines.push(`URL: ${subject.url}`);
 
@@ -325,6 +365,33 @@ function clampRelevance(n: number): number {
  * metered API, the local CLI only). Throws a clear, actionable error on spawn
  * failure or non-zero exit.
  */
+export function extractClaudeResult(stdout: string): string {
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(stdout);
+  } catch {
+    throw new Error(
+      `Could not parse \`claude\` JSON envelope from stdout. Got: ${stdout.slice(0, 500)}`,
+    );
+  }
+
+  // Array form: the result lives in the last `type:"result"` event.
+  const candidate = Array.isArray(envelope)
+    ? [...envelope]
+        .reverse()
+        .find((e) => (e as { type?: unknown })?.type === "result")
+    : envelope;
+
+  const result = (candidate as { result?: unknown } | undefined)?.result;
+  if (typeof result !== "string") {
+    throw new Error(
+      `\`claude\` JSON envelope had no string \`result\` field. ` +
+        `Envelope: ${JSON.stringify(envelope).slice(0, 500)}`,
+    );
+  }
+  return result;
+}
+
 export function runClaudeCli(prompt: string): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const child = spawn(
@@ -344,7 +411,10 @@ export function runClaudeCli(prompt: string): Promise<string> {
     });
 
     child.on("error", (err: NodeJS.ErrnoException) => {
-      const hint = err.code === "ENOENT" ? " — is the `claude` CLI installed and logged in?" : "";
+      const hint =
+        err.code === "ENOENT"
+          ? " — is the `claude` CLI installed and logged in?"
+          : "";
       reject(new Error(`Failed to spawn \`claude\`: ${err.message}${hint}`));
     });
 
@@ -362,34 +432,17 @@ export function runClaudeCli(prompt: string): Promise<string> {
         return;
       }
 
-      let envelope: unknown;
       try {
-        envelope = JSON.parse(stdout);
-      } catch {
-        reject(
-          new Error(
-            `Could not parse \`claude\` JSON envelope from stdout. Got: ${stdout.slice(0, 500)}`,
-          ),
-        );
-        return;
+        resolve(extractClaudeResult(stdout));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error(String(err)));
       }
-
-      const result = (envelope as { result?: unknown }).result;
-      if (typeof result !== "string") {
-        reject(
-          new Error(
-            `\`claude\` JSON envelope had no string \`result\` field. ` +
-              `Envelope: ${JSON.stringify(envelope).slice(0, 500)}`,
-          ),
-        );
-        return;
-      }
-
-      resolve(result);
     });
 
     child.stdin.on("error", (err: Error) => {
-      reject(new Error(`Failed to write prompt to \`claude\` stdin: ${err.message}`));
+      reject(
+        new Error(`Failed to write prompt to \`claude\` stdin: ${err.message}`),
+      );
     });
     child.stdin.write(prompt);
     child.stdin.end();
